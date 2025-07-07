@@ -1,392 +1,545 @@
-// DOM Elements
-const contactsList = document.getElementById('contacts-list');
-const messagesContainer = document.getElementById('messages-container');
-const messageInput = document.getElementById('message-input');
-const sendMessageBtn = document.getElementById('send-message-btn');
-const noChatSelected = document.getElementById('no-chat-selected');
-const activeChat = document.getElementById('active-chat');
-const chatUserName = document.getElementById('chat-user-name');
-const chatUserAvatar = document.getElementById('chat-user-avatar');
-const chatUserStatus = document.getElementById('chat-user-status');
-const searchContacts = document.getElementById('search-contacts');
-const voiceMessageBtn = document.getElementById('voice-message-btn');
-const voiceMessageModal = document.getElementById('voice-message-modal');
-const closeVoiceModal = document.getElementById('close-voice-modal');
-
-// Variables
-let currentUser = null;
-let selectedContact = null;
-let socket = null;
-
-// Initialize Socket
-function initializeSocket(userId) {
-    socket = io();
+// Chat module
+function initChat(socket, userData) {
+    let currentChat = null;
+    let messages = [];
+    let typingTimeout = null;
     
-    socket.on('connect', () => {
-        console.log('Connected to socket server');
-        socket.emit('join', userId);
-    });
+    // DOM elements
+    const contactsList = document.getElementById('contacts-list');
+    const messagesContainer = document.getElementById('messages-container');
+    const messageInput = document.getElementById('message-input');
+    const sendMessageBtn = document.getElementById('send-message-btn');
+    const noChatSelected = document.getElementById('no-chat-selected');
+    const activeChat = document.getElementById('active-chat');
+    const chatUserName = document.getElementById('chat-user-name');
+    const chatUserAvatar = document.getElementById('chat-user-avatar');
+    const chatUserStatus = document.getElementById('chat-user-status');
+    const chatUserLastSeen = document.getElementById('chat-user-last-seen');
+    const searchContactsInput = document.getElementById('search-contacts');
+    const voiceMessageBtn = document.getElementById('voice-message-btn');
+    const attachFileBtn = document.getElementById('attach-file-btn');
+    const emojiPickerBtn = document.getElementById('emoji-picker-btn');
+    const emojiPicker = document.getElementById('emoji-picker');
     
-    socket.on('receiveMessage', (message) => {
-        if (selectedContact && message.sender._id === selectedContact.id) {
-            displayMessage(message);
-            scrollToBottom();
-        } else {
-            // Update contact list with new message
-            updateContactList(message);
+    // Load conversations
+    loadConversations();
+    
+    // Event listeners
+    messageInput.addEventListener('input', handleTyping);
+    messageInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
         }
     });
-}
-
-// Load Contacts
-async function loadContacts() {
-    try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('/api/users', {
+    
+    sendMessageBtn.addEventListener('click', sendMessage);
+    voiceMessageBtn.addEventListener('click', showVoiceRecorder);
+    attachFileBtn.addEventListener('click', showFileUpload);
+    emojiPickerBtn.addEventListener('click', toggleEmojiPicker);
+    
+    searchContactsInput.addEventListener('input', searchContacts);
+    
+    // Socket events
+    socket.on('receiveMessage', handleNewMessage);
+    socket.on('messagesRead', handleMessagesRead);
+    socket.on('messageReaction', handleMessageReaction);
+    socket.on('typing', handleTypingIndicator);
+    socket.on('userStatusChanged', updateUserStatus);
+    
+    // Load emoji picker
+    initEmojiPicker();
+    
+    function loadConversations() {
+        // Show loading state
+        contactsList.innerHTML = '<div class="loading-spinner"></div>';
+        
+        fetch('/api/messages/conversations', {
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
             }
-        });
-        
-        if (!response.ok) {
-            throw new Error('Failed to load contacts');
-        }
-        
-        const contacts = await response.json();
-        displayContacts(contacts);
-    } catch (error) {
-        console.error('Error loading contacts:', error);
-    }
-}
-
-// Display Contacts
-function displayContacts(contacts) {
-    contactsList.innerHTML = '';
-    
-    contacts.forEach(contact => {
-        const contactItem = document.createElement('div');
-        contactItem.className = 'contact-item';
-        contactItem.dataset.id = contact._id;
-        
-        contactItem.innerHTML = `
-            <img src="${contact.avatar || 'assets/icons/default-avatar.png'}" alt="${contact.username}" class="contact-avatar">
-            <div class="contact-info">
-                <div class="contact-name">${contact.username}</div>
-                <div class="contact-last-message">Last message...</div>
-            </div>
-            <div class="contact-meta">
-                <div class="contact-time">Just now</div>
-                <div class="unread-count hidden">1</div>
-            </div>
-        `;
-        
-        contactItem.addEventListener('click', () => selectContact(contact));
-        contactsList.appendChild(contactItem);
-    });
-}
-
-// Select Contact
-async function selectContact(contact) {
-    selectedContact = contact;
-    
-    // Update UI
-    document.querySelectorAll('.contact-item').forEach(item => {
-        item.classList.remove('active');
-        if (item.dataset.id === contact._id) {
-            item.classList.add('active');
-        }
-    });
-    
-    chatUserName.textContent = contact.username;
-    chatUserAvatar.src = contact.avatar || 'assets/icons/default-avatar.png';
-    chatUserStatus.textContent = contact.status || 'offline';
-    chatUserStatus.className = 'status ' + (contact.status === 'online' ? 'online' : 'offline');
-    
-    noChatSelected.classList.add('hidden');
-    activeChat.classList.remove('hidden');
-    
-    // Load messages
-    await loadMessages(contact._id);
-    scrollToBottom();
-}
-
-// Load Messages
-async function loadMessages(contactId) {
-    try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`/api/messages/${contactId}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
+        })
+        .then(response => response.json())
+        .then(conversations => {
+            if (conversations.length === 0) {
+                contactsList.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-comment-alt"></i>
+                        <p>No conversations yet</p>
+                    </div>
+                `;
+                return;
             }
-        });
-        
-        if (!response.ok) {
-            throw new Error('Failed to load messages');
-        }
-        
-        const messages = await response.json();
-        displayMessages(messages);
-    } catch (error) {
-        console.error('Error loading messages:', error);
-    }
-}
-
-// Display Messages
-function displayMessages(messages) {
-    messagesContainer.innerHTML = '';
-    
-    messages.forEach(message => {
-        displayMessage(message);
-    });
-}
-
-// Display Single Message
-function displayMessage(message) {
-    const messageDiv = document.createElement('div');
-    const user = JSON.parse(localStorage.getItem('user'));
-    const isSent = message.sender._id === user.id;
-    
-    messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
-    
-    let content = message.content;
-    if (message.type === 'voice') {
-        content = `
-            <audio controls>
-                <source src="${message.content}" type="audio/wav">
-                Your browser does not support the audio element.
-            </audio>
-        `;
-    }
-    
-    const time = new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
-    messageDiv.innerHTML = `
-        ${content}
-        <div class="message-time">${time}</div>
-    `;
-    
-    messagesContainer.appendChild(messageDiv);
-}
-
-// Send Message
-function sendMessage() {
-    const content = messageInput.value.trim();
-    if (!content || !selectedContact) return;
-    
-    const user = JSON.parse(localStorage.getItem('user'));
-    
-    const message = {
-        senderId: user.id,
-        receiverId: selectedContact.id,
-        content,
-        type: 'text'
-    };
-    
-    socket.emit('sendMessage', message);
-    
-    // Display message immediately
-    const tempMessage = {
-        sender: { _id: user.id, username: user.username, avatar: user.avatar },
-        receiver: { _id: selectedContact.id, username: selectedContact.username, avatar: selectedContact.avatar },
-        content,
-        type: 'text',
-        timestamp: new Date(),
-        read: false
-    };
-    
-    displayMessage(tempMessage);
-    scrollToBottom();
-    
-    // Clear input
-    messageInput.value = '';
-}
-
-// Send Voice Message
-function sendVoiceMessage(audioBlob) {
-    if (!selectedContact) return;
-    
-    const user = JSON.parse(localStorage.getItem('user'));
-    
-    // In a real app, you would upload the blob to a server and get a URL
-    // For this example, we'll just create a fake URL
-    const audioUrl = URL.createObjectURL(audioBlob);
-    
-    const message = {
-        senderId: user.id,
-        receiverId: selectedContact.id,
-        content: audioUrl,
-        type: 'voice'
-    };
-    
-    socket.emit('sendMessage', message);
-    
-    // Display message immediately
-    const tempMessage = {
-        sender: { _id: user.id, username: user.username, avatar: user.avatar },
-        receiver: { _id: selectedContact.id, username: selectedContact.username, avatar: selectedContact.avatar },
-        content: audioUrl,
-        type: 'voice',
-        timestamp: new Date(),
-        read: false
-    };
-    
-    displayMessage(tempMessage);
-    scrollToBottom();
-}
-
-// Scroll to Bottom
-function scrollToBottom() {
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-}
-
-// Update Contact List
-function updateContactList(message) {
-    const contactItem = contactsList.querySelector(`[data-id="${message.sender._id}"]`);
-    if (contactItem) {
-        const lastMessage = contactItem.querySelector('.contact-last-message');
-        const time = contactItem.querySelector('.contact-time');
-        const unreadCount = contactItem.querySelector('.unread-count');
-        
-        lastMessage.textContent = message.type === 'text' ? message.content : 'Voice message';
-        time.textContent = new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        
-        if (!unreadCount.classList.contains('hidden')) {
-            const count = parseInt(unreadCount.textContent) + 1;
-            unreadCount.textContent = count;
-        } else {
-            unreadCount.classList.remove('hidden');
-            unreadCount.textContent = '1';
-        }
-    }
-}
-
-// Search Contacts
-searchContacts.addEventListener('input', () => {
-    const searchTerm = searchContacts.value.toLowerCase();
-    const contactItems = contactsList.querySelectorAll('.contact-item');
-    
-    contactItems.forEach(item => {
-        const name = item.querySelector('.contact-name').textContent.toLowerCase();
-        if (name.includes(searchTerm)) {
-            item.style.display = 'flex';
-        } else {
-            item.style.display = 'none';
-        }
-    });
-});
-
-// Event Listeners
-sendMessageBtn.addEventListener('click', sendMessage);
-messageInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        sendMessage();
-    }
-});
-
-voiceMessageBtn.addEventListener('click', () => {
-    voiceMessageModal.classList.remove('hidden');
-});
-
-closeVoiceModal.addEventListener('click', () => {
-    voiceMessageModal.classList.add('hidden');
-});
-
-// Initialize Voice Recorder
-let mediaRecorder;
-let audioChunks = [];
-let recordingInterval;
-let recordingSeconds = 0;
-
-const startRecordingBtn = document.getElementById('start-recording');
-const stopRecordingBtn = document.getElementById('stop-recording');
-const playRecordingBtn = document.getElementById('play-recording');
-const sendRecordingBtn = document.getElementById('send-recording');
-const recordingTimer = document.getElementById('recording-timer');
-const voiceVisualizer = document.getElementById('voice-visualizer');
-
-startRecordingBtn.addEventListener('click', startRecording);
-stopRecordingBtn.addEventListener('click', stopRecording);
-playRecordingBtn.addEventListener('click', playRecording);
-sendRecordingBtn.addEventListener('click', sendRecording);
-
-async function startRecording() {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        
-        mediaRecorder.ondataavailable = (event) => {
-            audioChunks.push(event.data);
-        };
-        
-        mediaRecorder.onstop = () => {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-            const audioUrl = URL.createObjectURL(audioBlob);
             
-            // For visualization, we would typically use the Web Audio API
-            // This is a simplified version
-            voiceVisualizer.innerHTML = `
-                <audio controls>
-                    <source src="${audioUrl}" type="audio/wav">
-                    Your browser does not support the audio element.
-                </audio>
+            contactsList.innerHTML = '';
+            
+            conversations.forEach(conversation => {
+                const contactItem = document.createElement('div');
+                contactItem.className = 'contact-item';
+                contactItem.dataset.userId = conversation.userId;
+                
+                const lastMessageTime = formatTime(conversation.lastMessage.createdAt);
+                const lastMessageContent = conversation.lastMessage.type === 'text' 
+                    ? conversation.lastMessage.content 
+                    : `[${conversation.lastMessage.type}]`;
+                
+                contactItem.innerHTML = `
+                    <div class="user-avatar-container">
+                        <img src="${conversation.avatar || 'assets/icons/default-avatar.png'}" 
+                             alt="${conversation.username}" class="contact-avatar">
+                        <span class="status-indicator ${conversation.status || 'offline'}"></span>
+                    </div>
+                    <div class="contact-info">
+                        <div class="contact-name">${conversation.username}</div>
+                        <div class="contact-last-message">${lastMessageContent}</div>
+                    </div>
+                    <div class="contact-meta">
+                        <div class="contact-time">${lastMessageTime}</div>
+                        ${conversation.unreadCount > 0 ? 
+                            `<div class="unread-count">${conversation.unreadCount}</div>` : ''}
+                    </div>
+                `;
+                
+                contactItem.addEventListener('click', () => {
+                    openChat(conversation.userId, conversation.username, 
+                            conversation.avatar, conversation.status);
+                });
+                
+                contactsList.appendChild(contactItem);
+            });
+            
+            // Open first conversation by default
+            if (conversations.length > 0 && !currentChat) {
+                const firstConversation = conversations[0];
+                openChat(firstConversation.userId, firstConversation.username, 
+                        firstConversation.avatar, firstConversation.status);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading conversations:', error);
+            contactsList.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Failed to load conversations</p>
+                </div>
             `;
+        });
+    }
+    
+    function openChat(userId, username, avatar, status) {
+        currentChat = userId;
+        
+        // Update UI
+        noChatSelected.classList.add('hidden');
+        activeChat.classList.remove('hidden');
+        
+        chatUserName.textContent = username;
+        chatUserAvatar.src = avatar || 'assets/icons/default-avatar.png';
+        chatUserStatus.className = `status-indicator ${status || 'offline'}`;
+        chatUserLastSeen.textContent = status === 'online' ? 'Online' : 'Last seen recently';
+        
+        // Highlight active contact
+        document.querySelectorAll('.contact-item').forEach(item => {
+            item.classList.remove('active');
+            if (item.dataset.userId === userId) {
+                item.classList.add('active');
+                // Clear unread count
+                const unreadCount = item.querySelector('.unread-count');
+                if (unreadCount) unreadCount.remove();
+            }
+        });
+        
+        // Load messages
+        loadMessages(userId);
+    }
+    
+    function loadMessages(userId) {
+        messagesContainer.innerHTML = '<div class="loading-spinner"></div>';
+        
+        fetch(`/api/messages/${userId}`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+            }
+        })
+        .then(response => response.json())
+        .then(messages => {
+            this.messages = messages;
+            renderMessages(messages);
+            
+            // Scroll to bottom
+            setTimeout(() => {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }, 100);
+        })
+        .catch(error => {
+            console.error('Error loading messages:', error);
+            messagesContainer.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Failed to load messages</p>
+                </div>
+            `;
+        });
+    }
+    
+    function renderMessages(messages) {
+        messagesContainer.innerHTML = '';
+        
+        if (messages.length === 0) {
+            messagesContainer.innerHTML = `
+                <div class="empty-state">
+                    <p>No messages yet</p>
+                </div>
+            `;
+            return;
+        }
+        
+        let currentDate = null;
+        
+        messages.forEach(message => {
+            // Add date separator if needed
+            const messageDate = new Date(message.createdAt).toDateString();
+            if (messageDate !== currentDate) {
+                currentDate = messageDate;
+                const dateElement = document.createElement('div');
+                dateElement.className = 'message-date';
+                dateElement.innerHTML = `<span>${formatDate(message.createdAt)}</span>`;
+                messagesContainer.appendChild(dateElement);
+            }
+            
+            const isSent = message.sender.userId === userData.userId;
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${isSent ? 'sent' : 'received'}`;
+            
+            let contentHtml = '';
+            if (message.type === 'text') {
+                contentHtml = `<div class="message-content">${message.content}</div>`;
+            } else if (message.type === 'image') {
+                contentHtml = `
+                    <div class="message-file">
+                        <img src="${message.fileUrl}" alt="Image">
+                    </div>
+                `;
+            } else if (message.type === 'video') {
+                contentHtml = `
+                    <div class="message-file">
+                        <video controls>
+                            <source src="${message.fileUrl}" type="video/mp4">
+                        </video>
+                    </div>
+                `;
+            } else if (message.type === 'voice') {
+                contentHtml = `
+                    <div class="message-content">
+                        <i class="fas fa-microphone"></i> Voice message
+                        <audio controls src="${message.fileUrl}"></audio>
+                    </div>
+                `;
+            } else if (message.type === 'file') {
+                contentHtml = `
+                    <div class="message-file">
+                        <div class="file-info">
+                            <i class="fas fa-file"></i>
+                            <div class="file-name">${message.content}</div>
+                            <a href="${message.fileUrl}" download><i class="fas fa-download"></i></a>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Add reactions if any
+            let reactionsHtml = '';
+            if (message.reactions && message.reactions.length > 0) {
+                // Group reactions by emoji
+                const reactionGroups = {};
+                message.reactions.forEach(reaction => {
+                    if (!reactionGroups[reaction.emoji]) {
+                        reactionGroups[reaction.emoji] = 0;
+                    }
+                    reactionGroups[reaction.emoji]++;
+                });
+                
+                reactionsHtml = '<div class="message-reactions">';
+                for (const [emoji, count] of Object.entries(reactionGroups)) {
+                    reactionsHtml += `
+                        <div class="message-reaction">
+                            <span>${emoji}</span>
+                            <span class="message-reaction-count">${count}</span>
+                        </div>
+                    `;
+                }
+                reactionsHtml += '</div>';
+            }
+            
+            messageElement.innerHTML = `
+                ${contentHtml}
+                <div class="message-time">${formatTime(message.createdAt)}</div>
+                ${reactionsHtml}
+                <button class="add-reaction-btn">+</button>
+            `;
+            
+            messagesContainer.appendChild(messageElement);
+            
+            // Add reaction handler
+            const addReactionBtn = messageElement.querySelector('.add-reaction-btn');
+            if (addReactionBtn) {
+                addReactionBtn.addEventListener('click', () => {
+                    // In a real app, this would open an emoji picker
+                    const emoji = '👍'; // Default reaction
+                    addReaction(message.messageId, emoji);
+                });
+            }
+        });
+    }
+    
+    function sendMessage() {
+        const content = messageInput.value.trim();
+        if (!content || !currentChat) return;
+        
+        // Create message object
+        const message = {
+            receiverId: currentChat,
+            content: content,
+            type: 'text'
         };
         
-        audioChunks = [];
-        mediaRecorder.start();
+        // Clear input
+        messageInput.value = '';
         
-        // Start timer
-        recordingSeconds = 0;
-        updateTimer();
-        recordingInterval = setInterval(updateTimer, 1000);
+        // Send via socket
+        socket.emit('sendMessage', message);
         
-        // Update UI
-        startRecordingBtn.classList.add('hidden');
-        stopRecordingBtn.classList.remove('hidden');
-        recordingTimer.classList.remove('hidden');
-    } catch (error) {
-        console.error('Error starting recording:', error);
-        alert('Could not access microphone. Please check permissions.');
-    }
-}
-
-function stopRecording() {
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        mediaRecorder.stop();
-        clearInterval(recordingInterval);
+        // Optimistically add to UI
+        const tempMessage = {
+            messageId: 'temp-' + Date.now(),
+            sender: { userId: userData.userId, username: userData.username, avatar: userData.avatar },
+            receiver: { userId: currentChat },
+            content: content,
+            type: 'text',
+            createdAt: new Date().toISOString(),
+            read: false,
+            delivered: false
+        };
         
-        // Update UI
-        stopRecordingBtn.classList.add('hidden');
-        playRecordingBtn.classList.remove('hidden');
-        sendRecordingBtn.classList.remove('hidden');
-    }
-}
-
-function playRecording() {
-    const audio = voiceVisualizer.querySelector('audio');
-    if (audio) {
-        audio.play();
-    }
-}
-
-function sendRecording() {
-    if (audioChunks.length > 0) {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-        sendVoiceMessage(audioBlob);
+        messages.push(tempMessage);
+        renderMessages(messages);
         
-        // Reset
-        voiceMessageModal.classList.add('hidden');
-        voiceVisualizer.innerHTML = '';
-        playRecordingBtn.classList.add('hidden');
-        sendRecordingBtn.classList.add('hidden');
-        startRecordingBtn.classList.remove('hidden');
-        recordingTimer.classList.add('hidden');
+        // Scroll to bottom
+        setTimeout(() => {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }, 100);
     }
-}
-
-function updateTimer() {
-    recordingSeconds++;
-    const minutes = Math.floor(recordingSeconds / 60).toString().padStart(2, '0');
-    const seconds = (recordingSeconds % 60).toString().padStart(2, '0');
-    recordingTimer.textContent = `${minutes}:${seconds}`;
+    
+    function handleNewMessage(message) {
+        if (message.sender.userId === currentChat || message.receiver.userId === currentChat) {
+            // Add to current chat
+            messages.push(message);
+            renderMessages(messages);
+            
+            // Scroll to bottom
+            setTimeout(() => {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }, 100);
+            
+            // Mark as read if it's the active chat
+            if (message.sender.userId === currentChat) {
+                socket.emit('messagesRead', { userId: currentChat });
+            }
+        } else {
+            // Update conversation list
+            const contactItem = contactsList.querySelector(`[data-user-id="${message.sender.userId}"]`);
+            if (contactItem) {
+                const lastMessage = contactItem.querySelector('.contact-last-message');
+                const messageTime = contactItem.querySelector('.contact-time');
+                const unreadCount = contactItem.querySelector('.unread-count');
+                
+                lastMessage.textContent = message.type === 'text' ? message.content : `[${message.type}]`;
+                messageTime.textContent = formatTime(message.createdAt);
+                
+                if (!unreadCount) {
+                    const unreadDiv = document.createElement('div');
+                    unreadDiv.className = 'unread-count';
+                    unreadDiv.textContent = '1';
+                    contactItem.querySelector('.contact-meta').appendChild(unreadDiv);
+                } else {
+                    unreadCount.textContent = parseInt(unreadCount.textContent) + 1;
+                }
+                
+                // Move to top
+                contactsList.prepend(contactItem);
+            }
+            
+            // Show notification
+            if (document.hidden || !document.hasFocus()) {
+                showNotification('New Message', 
+                    `From ${message.sender.username}: ${message.type === 'text' ? message.content : `[${message.type}]`}`);
+            }
+        }
+    }
+    
+    function handleMessagesRead(data) {
+        if (data.by === currentChat) {
+            // Update read status for messages
+            messages.forEach(msg => {
+                if (msg.sender.userId === userData.userId && !msg.read) {
+                    msg.read = true;
+                }
+            });
+            renderMessages(messages);
+        }
+    }
+    
+    function handleMessageReaction(message) {
+        // Update the message in our local array
+        const index = messages.findIndex(m => m.messageId === message.messageId);
+        if (index !== -1) {
+            messages[index] = message;
+            renderMessages(messages);
+        }
+    }
+    
+    function handleTyping() {
+        if (!currentChat) return;
+        
+        // Notify server that user is typing
+        socket.emit('typing', {
+            receiverId: currentChat,
+            isTyping: true
+        });
+        
+        // Reset typing indicator after delay
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+            socket.emit('typing', {
+                receiverId: currentChat,
+                isTyping: false
+            });
+        }, 2000);
+    }
+    
+    function handleTypingIndicator(data) {
+        if (data.senderId === currentChat) {
+            const typingIndicator = document.getElementById('typing-indicator') || 
+                document.createElement('div');
+            
+            typingIndicator.id = 'typing-indicator';
+            typingIndicator.className = 'typing-indicator';
+            typingIndicator.innerHTML = `
+                <div class="typing-dots">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+                <span>Typing...</span>
+            `;
+            
+            if (data.isTyping) {
+                if (!document.getElementById('typing-indicator')) {
+                    messagesContainer.appendChild(typingIndicator);
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }
+            } else {
+                if (document.getElementById('typing-indicator')) {
+                    typingIndicator.remove();
+                }
+            }
+        }
+    }
+    
+    function updateUserStatus(data) {
+        // Update in contacts list
+        const contactItem = contactsList.querySelector(`[data-user-id="${data.userId}"]`);
+        if (contactItem) {
+            const statusIndicator = contactItem.querySelector('.status-indicator');
+            if (statusIndicator) {
+                statusIndicator.className = `status-indicator ${data.status}`;
+            }
+        }
+        
+        // Update in active chat
+        if (currentChat === data.userId) {
+            chatUserStatus.className = `status-indicator ${data.status}`;
+            chatUserLastSeen.textContent = data.status === 'online' ? 'Online' : 'Last seen recently';
+        }
+    }
+    
+    function searchContacts() {
+        const searchTerm = searchContactsInput.value.toLowerCase();
+        if (!searchTerm) {
+            loadConversations();
+            return;
+        }
+        
+        const contactItems = contactsList.querySelectorAll('.contact-item');
+        contactItems.forEach(item => {
+            const name = item.querySelector('.contact-name').textContent.toLowerCase();
+            const lastMessage = item.querySelector('.contact-last-message').textContent.toLowerCase();
+            
+            if (name.includes(searchTerm) || lastMessage.includes(searchTerm)) {
+                item.style.display = 'flex';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    }
+    
+    function showVoiceRecorder() {
+        document.getElementById('voice-message-modal').classList.add('active');
+        initVoiceRecorder();
+    }
+    
+    function showFileUpload() {
+        document.getElementById('file-upload-modal').classList.add('active');
+        initFileUpload();
+    }
+    
+    function toggleEmojiPicker() {
+        emojiPicker.classList.toggle('active');
+    }
+    
+    function initEmojiPicker() {
+        // In a real app, this would use an emoji library
+        // This is a simplified version
+        const emojiGrid = document.getElementById('emoji-grid');
+        const emojis = ['😀', '😂', '😍', '👍', '❤️', '🔥', '🎉', '🤔', '👋', '🎶'];
+        
+        emojis.forEach(emoji => {
+            const emojiItem = document.createElement('div');
+            emojiItem.className = 'emoji-item';
+            emojiItem.textContent = emoji;
+            emojiItem.addEventListener('click', () => {
+                messageInput.value += emoji;
+                emojiPicker.classList.remove('active');
+            });
+            emojiGrid.appendChild(emojiItem);
+        });
+    }
+    
+    function addReaction(messageId, emoji) {
+        socket.emit('messageReact', {
+            messageId: messageId,
+            emoji: emoji
+        });
+    }
+    
+    // Helper functions
+    function formatTime(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        
+        if (date.toDateString() === today.toDateString()) {
+            return 'Today';
+        } else if (date.toDateString() === yesterday.toDateString()) {
+            return 'Yesterday';
+        } else {
+            return date.toLocaleDateString();
+        }
+    }
 }

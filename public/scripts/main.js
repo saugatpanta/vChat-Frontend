@@ -1,375 +1,241 @@
-// main.js - Entry point for vChat application
-
-// DOM Elements
-const appContainer = document.querySelector('.app-container');
-
-// Application State
-let currentUser = null;
-let selectedContact = null;
-let socket = null;
-
-// Initialize the application when DOM is loaded
+// Main application controller
 document.addEventListener('DOMContentLoaded', () => {
+    // Initialize theme
+    initTheme();
+    
+    // Initialize socket connection
+    let socket;
+    
     // Check authentication status
-    checkAuthStatus();
-    
-    // Initialize all event listeners
-    initializeEventListeners();
-    
-    // Load any saved preferences
-    loadPreferences();
-});
-
-// Check authentication status
-function checkAuthStatus() {
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
+    const token = localStorage.getItem('accessToken');
+    const userData = JSON.parse(localStorage.getItem('userData'));
     
     if (token && userData) {
-        try {
-            currentUser = JSON.parse(userData);
-            showChatInterface();
-            initializeSocketConnection();
-            loadContacts();
-        } catch (error) {
-            console.error('Error parsing user data:', error);
-            showAuthInterface();
-        }
+        // User is logged in
+        initChatApp(token, userData);
     } else {
-        showAuthInterface();
+        // Show auth section
+        document.getElementById('auth-section').classList.remove('hidden');
+        initAuth();
     }
+    
+    // Initialize service worker for PWA
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').then(registration => {
+                console.log('ServiceWorker registration successful');
+            }).catch(err => {
+                console.log('ServiceWorker registration failed: ', err);
+            });
+        });
+    }
+});
+
+function initTheme() {
+    // Check for saved theme preference
+    const savedTheme = localStorage.getItem('theme') || 'system';
+    const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    
+    const applyTheme = (theme) => {
+        if (theme === 'dark' || (theme === 'system' && darkModeMediaQuery.matches)) {
+            document.body.classList.add('dark-mode');
+        } else {
+            document.body.classList.remove('dark-mode');
+        }
+    };
+    
+    // Apply saved theme
+    applyTheme(savedTheme);
+    
+    // Listen for system theme changes
+    darkModeMediaQuery.addListener((e) => {
+        const theme = localStorage.getItem('theme') || 'system';
+        if (theme === 'system') {
+            applyTheme(theme);
+        }
+    });
+    
+    // Theme toggle in settings
+    document.getElementById('dark-mode-toggle')?.addEventListener('change', (e) => {
+        const theme = e.target.checked ? 'dark' : 'light';
+        localStorage.setItem('theme', theme);
+        applyTheme(theme);
+    });
 }
 
-// Show authentication interface
-function showAuthInterface() {
+function initChatApp(token, userData) {
+    // Connect to Socket.IO
+    socket = io('https://your-backend-url.com', {
+        auth: {
+            token: token
+        },
+        transports: ['websocket'],
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000
+    });
+    
+    // Handle socket connection
+    socket.on('connect', () => {
+        console.log('Connected to WebSocket server');
+        
+        // Update UI
+        document.getElementById('auth-section').classList.add('hidden');
+        document.getElementById('chat-section').classList.remove('hidden');
+        
+        // Display user info
+        document.getElementById('username-display').textContent = userData.username;
+        document.getElementById('user-avatar').src = userData.avatar || 'assets/icons/default-avatar.png';
+        document.getElementById('user-status').textContent = 'Online';
+        document.getElementById('user-status').className = 'status online';
+        
+        // Initialize modules
+        initChat(socket, userData);
+        initFriends(socket, userData);
+        initCalls(socket, userData);
+        initSettings(socket, userData);
+        initNotifications(socket);
+    });
+    
+    socket.on('disconnect', (reason) => {
+        console.log('Disconnected from WebSocket server:', reason);
+        if (reason === 'io server disconnect') {
+            // The server forcibly disconnected the socket, try to reconnect
+            socket.connect();
+        }
+        // Update status to offline
+        document.getElementById('user-status').textContent = 'Offline';
+        document.getElementById('user-status').className = 'status offline';
+    });
+    
+    socket.on('connect_error', (err) => {
+        console.log('Connection error:', err.message);
+        showNotification('Connection error', 'Unable to connect to the server', 'error');
+    });
+    
+    // Handle token expiration
+    socket.on('tokenExpired', () => {
+        showNotification('Session expired', 'Please log in again', 'error');
+        logout();
+    });
+    
+    // Initialize tab switching
+    initTabs();
+}
+
+function initAuthTabs() {
+    const authTabs = document.querySelectorAll('.auth-tabs .tab-btn');
+    const authContents = document.querySelectorAll('.auth-tab-content');
+    
+    authTabs.forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            e.preventDefault();
+            const tabName = tab.dataset.tab;
+            
+            // Update active tab
+            authTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            // Show corresponding content
+            authContents.forEach(content => {
+                content.classList.remove('active');
+                if (content.id === `${tabName}-tab`) {
+                    content.classList.add('active');
+                }
+            });
+        });
+    });
+    
+    // Initialize with login tab active
+    document.querySelector('.auth-tabs .tab-btn[data-tab="login"]').classList.add('active');
+    document.getElementById('login-tab').classList.add('active');
+}
+
+function logout() {
+    // Clear local storage
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('userData');
+    
+    // Disconnect socket
+    if (socket) socket.disconnect();
+    
+    // Show auth section
     document.getElementById('auth-section').classList.remove('hidden');
     document.getElementById('chat-section').classList.add('hidden');
+    
+    // Reset auth forms
+    document.getElementById('login-form').reset();
+    document.getElementById('register-form').reset();
+    
+    // Show login tab
+    document.querySelectorAll('.auth-tab-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    document.getElementById('login-tab').classList.add('active');
+    
+    document.querySelectorAll('.auth-tabs .tab-btn').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelector('.auth-tabs .tab-btn[data-tab="login"]').classList.add('active');
 }
 
-// Show chat interface
-function showChatInterface() {
-    document.getElementById('auth-section').classList.add('hidden');
-    document.getElementById('chat-section').classList.remove('hidden');
+// Global notification function
+function showNotification(title, message, type = 'info') {
+    const toast = document.getElementById('notification-toast');
+    const toastTitle = toast.querySelector('.toast-title');
+    const toastMessage = toast.querySelector('.toast-message');
+    const toastIcon = toast.querySelector('.toast-icon i');
     
-    // Update user profile in sidebar
-    if (currentUser) {
-        document.getElementById('username-display').textContent = currentUser.username;
-        document.getElementById('user-avatar').src = currentUser.avatar || 'assets/icons/default-avatar.png';
-    }
-}
-
-// Initialize Socket.io connection
-function initializeSocketConnection() {
-    if (!currentUser) return;
+    // Set content
+    toastTitle.textContent = title;
+    toastMessage.textContent = message;
     
-    socket = io();
+    // Set icon based on type
+    let icon = 'fa-info-circle';
+    let bgColor = 'var(--primary-color)';
     
-    socket.on('connect', () => {
-        console.log('Connected to socket server with ID:', socket.id);
-        socket.emit('join', currentUser.id);
-    });
-    
-    socket.on('disconnect', () => {
-        console.log('Disconnected from socket server');
-    });
-    
-    // Initialize chat and call event handlers
-    initializeChatEvents();
-    initializeCallEvents();
-}
-
-// Initialize all event listeners
-function initializeEventListeners() {
-    // Auth event listeners are initialized in auth.js
-    
-    // Chat navigation
-    document.getElementById('logout-btn').addEventListener('click', handleLogout);
-    
-    // Theme switcher (example - would need additional CSS)
-    const themeSwitcher = document.createElement('div');
-    themeSwitcher.className = 'theme-switcher';
-    themeSwitcher.innerHTML = `
-        <button id="light-theme"><i class="fas fa-sun"></i></button>
-        <button id="dark-theme"><i class="fas fa-moon"></i></button>
-    `;
-    document.querySelector('.sidebar-header').appendChild(themeSwitcher);
-    
-    document.getElementById('light-theme').addEventListener('click', () => {
-        document.body.classList.remove('dark-theme');
-        localStorage.setItem('theme', 'light');
-    });
-    
-    document.getElementById('dark-theme').addEventListener('click', () => {
-        document.body.classList.add('dark-theme');
-        localStorage.setItem('theme', 'dark');
-    });
-}
-
-// Handle logout
-function handleLogout() {
-    if (socket) {
-        socket.disconnect();
+    switch (type) {
+        case 'success':
+            icon = 'fa-check-circle';
+            bgColor = 'var(--success-color)';
+            break;
+        case 'error':
+            icon = 'fa-exclamation-circle';
+            bgColor = 'var(--error-color)';
+            break;
+        case 'warning':
+            icon = 'fa-exclamation-triangle';
+            bgColor = 'var(--warning-color)';
+            break;
     }
     
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    currentUser = null;
-    selectedContact = null;
+    toastIcon.className = `fas ${icon}`;
+    toast.querySelector('.toast-icon').style.backgroundColor = bgColor;
     
-    showAuthInterface();
+    // Show toast
+    toast.classList.add('active');
+    
+    // Auto hide after 5 seconds
+    setTimeout(() => {
+        toast.classList.remove('active');
+    }, 5000);
 }
 
-// Load user preferences
-function loadPreferences() {
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    if (savedTheme === 'dark') {
-        document.body.classList.add('dark-theme');
-    }
-}
+// Close notification handler
+document.querySelector('.toast-close').addEventListener('click', () => {
+    document.getElementById('notification-toast').classList.remove('active');
+});
 
-// Initialize chat event handlers
-function initializeChatEvents() {
-    if (!socket) return;
-    
-    socket.on('receiveMessage', (message) => {
-        if (selectedContact && message.sender._id === selectedContact.id) {
-            displayMessage(message);
-            scrollToBottom();
-        } else {
-            updateContactList(message);
-        }
-    });
-    
-    socket.on('userStatusChange', (data) => {
-        updateUserStatus(data.userId, data.status);
-    });
-}
+// Logout button
+document.getElementById('logout-btn').addEventListener('click', logout);
 
-// Initialize call event handlers
-function initializeCallEvents() {
-    if (!socket) return;
-    
-    socket.on('incomingCall', ({ from, signal, callType }) => {
-        showIncomingCall(from, callType);
-    });
-    
-    socket.on('callAccepted', (signal) => {
-        if (peerConnection) {
-            peerConnection.setRemoteDescription(new RTCSessionDescription(signal));
-        }
-    });
-    
-    socket.on('callRejected', () => {
-        endCall();
-        alert('Call was rejected');
-    });
-    
-    socket.on('callEnded', () => {
-        endCall();
-        alert('Call ended by the other party');
-    });
-    
-    socket.on('iceCandidate', (candidate) => {
-        if (peerConnection) {
-            peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-        }
-    });
-}
+// Settings button
+document.getElementById('settings-btn').addEventListener('click', () => {
+    document.getElementById('settings-panel').classList.toggle('active');
+});
 
-// Load contacts from server
-async function loadContacts() {
-    try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('/api/users', {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-        
-        if (!response.ok) throw new Error('Failed to load contacts');
-        
-        const contacts = await response.json();
-        displayContacts(contacts);
-    } catch (error) {
-        console.error('Error loading contacts:', error);
-        alert('Failed to load contacts. Please try again.');
-    }
-}
-
-// Display contacts in the sidebar
-function displayContacts(contacts) {
-    const contactsList = document.getElementById('contacts-list');
-    contactsList.innerHTML = '';
-    
-    contacts.forEach(contact => {
-        const contactElement = document.createElement('div');
-        contactElement.className = 'contact-item';
-        contactElement.dataset.id = contact._id;
-        
-        contactElement.innerHTML = `
-            <img src="${contact.avatar || 'assets/icons/default-avatar.png'}" 
-                 alt="${contact.username}" class="contact-avatar">
-            <div class="contact-info">
-                <div class="contact-name">${contact.username}</div>
-                <div class="contact-last-message">${contact.status || 'offline'}</div>
-            </div>
-            <div class="contact-meta">
-                <div class="contact-time">${formatLastSeen(contact.lastSeen)}</div>
-                <div class="unread-count hidden">0</div>
-            </div>
-        `;
-        
-        contactElement.addEventListener('click', () => selectContact(contact));
-        contactsList.appendChild(contactElement);
-    });
-}
-
-// Format last seen time
-function formatLastSeen(timestamp) {
-    if (!timestamp) return '';
-    const now = new Date();
-    const lastSeen = new Date(timestamp);
-    const diff = now - lastSeen;
-    
-    if (diff < 60000) return 'Just now';
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-    return `${Math.floor(diff / 86400000)}d ago`;
-}
-
-// Select a contact to chat with
-async function selectContact(contact) {
-    selectedContact = contact;
-    
-    // Update UI
-    document.querySelectorAll('.contact-item').forEach(item => {
-        item.classList.remove('active');
-        if (item.dataset.id === contact._id) {
-            item.classList.add('active');
-        }
-    });
-    
-    document.getElementById('chat-user-name').textContent = contact.username;
-    document.getElementById('chat-user-avatar').src = contact.avatar || 'assets/icons/default-avatar.png';
-    document.getElementById('chat-user-status').textContent = contact.status || 'offline';
-    document.getElementById('chat-user-status').className = 'status ' + (contact.status === 'online' ? 'online' : 'offline');
-    
-    document.getElementById('no-chat-selected').classList.add('hidden');
-    document.getElementById('active-chat').classList.remove('hidden');
-    
-    // Load messages
-    await loadMessages(contact._id);
-    scrollToBottom();
-}
-
-// Load messages for a contact
-async function loadMessages(contactId) {
-    try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`/api/messages/${contactId}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-        
-        if (!response.ok) throw new Error('Failed to load messages');
-        
-        const messages = await response.json();
-        displayMessages(messages);
-    } catch (error) {
-        console.error('Error loading messages:', error);
-    }
-}
-
-// Display messages in the chat area
-function displayMessages(messages) {
-    const messagesContainer = document.getElementById('messages-container');
-    messagesContainer.innerHTML = '';
-    
-    messages.forEach(message => {
-        displayMessage(message);
-    });
-}
-
-// Display a single message
-function displayMessage(message) {
-    const messagesContainer = document.getElementById('messages-container');
-    const isCurrentUser = message.sender._id === currentUser.id;
-    
-    const messageElement = document.createElement('div');
-    messageElement.className = `message ${isCurrentUser ? 'sent' : 'received'}`;
-    
-    let content = message.content;
-    if (message.type === 'voice') {
-        content = `
-            <audio controls>
-                <source src="${message.content}" type="audio/wav">
-                Your browser does not support audio elements.
-            </audio>
-        `;
-    }
-    
-    const time = new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
-    messageElement.innerHTML = `
-        ${content}
-        <div class="message-time">${time}</div>
-    `;
-    
-    messagesContainer.appendChild(messageElement);
-}
-
-// Scroll to bottom of messages container
-function scrollToBottom() {
-    const messagesContainer = document.getElementById('messages-container');
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-}
-
-// Update contact list when a new message is received
-function updateContactList(message) {
-    const contactItem = document.querySelector(`.contact-item[data-id="${message.sender._id}"]`);
-    if (contactItem) {
-        const lastMessage = contactItem.querySelector('.contact-last-message');
-        const timeElement = contactItem.querySelector('.contact-time');
-        const unreadCount = contactItem.querySelector('.unread-count');
-        
-        lastMessage.textContent = message.content.length > 30 
-            ? message.content.substring(0, 30) + '...' 
-            : message.content;
-        
-        timeElement.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        
-        if (!unreadCount.classList.contains('hidden')) {
-            unreadCount.textContent = parseInt(unreadCount.textContent) + 1;
-        } else {
-            unreadCount.classList.remove('hidden');
-            unreadCount.textContent = '1';
-        }
-    }
-}
-
-// Update user status in the contact list
-function updateUserStatus(userId, status) {
-    const contactItem = document.querySelector(`.contact-item[data-id="${userId}"]`);
-    if (contactItem) {
-        const statusElement = contactItem.querySelector('.contact-last-message');
-        statusElement.textContent = status;
-        
-        if (selectedContact && selectedContact.id === userId) {
-            document.getElementById('chat-user-status').textContent = status;
-            document.getElementById('chat-user-status').className = 'status ' + (status === 'online' ? 'online' : 'offline');
-        }
-    }
-}
-
-// Export functions that need to be accessed by other modules
-window.app = {
-    currentUser: () => currentUser,
-    selectedContact: () => selectedContact,
-    socket: () => socket,
-    showAuthInterface,
-    showChatInterface,
-    initializeSocketConnection,
-    loadContacts,
-    updateUserStatus
-};
+// Close settings button
+document.getElementById('close-settings-btn').addEventListener('click', () => {
+    document.getElementById('settings-panel').classList.remove('active');
+});

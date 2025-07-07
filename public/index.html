@@ -5,83 +5,154 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>vChat - Modern Chat Application</title>
     <link rel="stylesheet" href="assets/styles/style.css">
+    <link rel="stylesheet" href="assets/styles/animations.css">
     <link rel="icon" href="assets/icons/app-icon.png" type="image/png">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="app-container">
         <!-- Auth Section (shown when not logged in) -->
         <div id="auth-section" class="auth-section">
             <div class="auth-container">
+                <div class="auth-header">
+                    <img src="assets/icons/app-icon.png" alt="vChat Logo" class="auth-logo">
+                    <h1>vChat</h1>
+                    <p>Connect with friends and family</p>
+                </div>
+                
                 <div class="auth-tabs">
                     <button class="tab-btn active" data-tab="login">Login</button>
                     <button class="tab-btn" data-tab="register">Register</button>
                 </div>
                 
                 <div id="login-tab" class="auth-tab-content active">
-                    <h2>Welcome to vChat</h2>
-                    <form id="login-form">
+                    <form id="login-form" class="auth-form">
                         <div class="form-group">
                             <label for="login-email">Email</label>
-                            <input type="email" id="login-email" required>
+                            <div class="input-with-icon">
+                                <i class="fas fa-envelope"></i>
+                                <input type="email" id="login-email" required placeholder="Enter your email">
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="login-password">Password</label>
-                            <input type="password" id="login-password" required>
+                            <div class="input-with-icon">
+                                <i class="fas fa-lock"></i>
+                                <input type="password" id="login-password" required placeholder="Enter your password">
+                                <i class="fas fa-eye show-password-toggle"></i>
+                            </div>
                         </div>
-                        <button type="submit" class="btn-primary">Login</button>
+                        <button type="submit" class="btn-primary">
+                            <span class="btn-text">Login</span>
+                            <i class="fas fa-spinner fa-spin loading-icon"></i>
+                        </button>
                         <p class="auth-link" id="forgot-password-link">Forgot password?</p>
                     </form>
+                    <div class="auth-divider">
+                        <span>or continue with</span>
+                    </div>
+                    <div class="social-auth">
+                        <button class="social-btn google-btn">
+                            <i class="fab fa-google"></i> Google
+                        </button>
+                        <button class="social-btn facebook-btn">
+                            <i class="fab fa-facebook-f"></i> Facebook
+                        </button>
+                    </div>
                 </div>
                 
                 <div id="register-tab" class="auth-tab-content">
-                    <h2>Create Account</h2>
-                    <form id="register-form">
+                    <form id="register-form" class="auth-form">
                         <div class="form-group">
                             <label for="register-username">Username</label>
-                            <input type="text" id="register-username" required>
+                            <div class="input-with-icon">
+                                <i class="fas fa-user"></i>
+                                <input type="text" id="register-username" required placeholder="Choose a username">
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="register-email">Email</label>
-                            <input type="email" id="register-email" required>
+                            <div class="input-with-icon">
+                                <i class="fas fa-envelope"></i>
+                                <input type="email" id="register-email" required placeholder="Enter your email">
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="register-password">Password</label>
-                            <input type="password" id="register-password" required>
+                            <div class="input-with-icon">
+                                <i class="fas fa-lock"></i>
+                                <input type="password" id="register-password" required placeholder="Create a password">
+                                <i class="fas fa-eye show-password-toggle"></i>
+                            </div>
+                            <div class="password-strength">
+                                <div class="strength-bar"></div>
+                                <div class="strength-bar"></div>
+                                <div class="strength-bar"></div>
+                                <span class="strength-text">Weak</span>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="register-confirm-password">Confirm Password</label>
-                            <input type="password" id="register-confirm-password" required>
+                            <div class="input-with-icon">
+                                <i class="fas fa-lock"></i>
+                                <input type="password" id="register-confirm-password" required placeholder="Confirm your password">
+                                <i class="fas fa-eye show-password-toggle"></i>
+                            </div>
                         </div>
-                        <button type="submit" class="btn-primary">Register</button>
+                        <button type="submit" class="btn-primary">
+                            <span class="btn-text">Register</span>
+                            <i class="fas fa-spinner fa-spin loading-icon"></i>
+                        </button>
                     </form>
                 </div>
                 
                 <div id="forgot-password-tab" class="auth-tab-content">
-                    <h2>Reset Password</h2>
-                    <form id="forgot-password-form">
+                    <form id="forgot-password-form" class="auth-form">
                         <div class="form-group">
                             <label for="forgot-email">Email</label>
-                            <input type="email" id="forgot-email" required>
+                            <div class="input-with-icon">
+                                <i class="fas fa-envelope"></i>
+                                <input type="email" id="forgot-email" required placeholder="Enter your email">
+                            </div>
                         </div>
-                        <button type="submit" class="btn-primary">Send Reset Link</button>
+                        <button type="submit" class="btn-primary">
+                            <span class="btn-text">Send Reset Link</span>
+                            <i class="fas fa-spinner fa-spin loading-icon"></i>
+                        </button>
                         <p class="auth-link" id="back-to-login">Back to login</p>
                     </form>
                 </div>
                 
                 <div id="reset-password-tab" class="auth-tab-content">
-                    <h2>Set New Password</h2>
-                    <form id="reset-password-form">
+                    <form id="reset-password-form" class="auth-form">
                         <input type="hidden" id="reset-token">
                         <div class="form-group">
                             <label for="new-password">New Password</label>
-                            <input type="password" id="new-password" required>
+                            <div class="input-with-icon">
+                                <i class="fas fa-lock"></i>
+                                <input type="password" id="new-password" required placeholder="Enter new password">
+                                <i class="fas fa-eye show-password-toggle"></i>
+                            </div>
+                            <div class="password-strength">
+                                <div class="strength-bar"></div>
+                                <div class="strength-bar"></div>
+                                <div class="strength-bar"></div>
+                                <span class="strength-text">Weak</span>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="confirm-new-password">Confirm New Password</label>
-                            <input type="password" id="confirm-new-password" required>
+                            <div class="input-with-icon">
+                                <i class="fas fa-lock"></i>
+                                <input type="password" id="confirm-new-password" required placeholder="Confirm new password">
+                                <i class="fas fa-eye show-password-toggle"></i>
+                            </div>
                         </div>
-                        <button type="submit" class="btn-primary">Reset Password</button>
+                        <button type="submit" class="btn-primary">
+                            <span class="btn-text">Reset Password</span>
+                            <i class="fas fa-spinner fa-spin loading-icon"></i>
+                        </button>
                     </form>
                 </div>
             </div>
@@ -89,66 +160,266 @@
         
         <!-- Main Chat Section (shown when logged in) -->
         <div id="chat-section" class="chat-section hidden">
+            <!-- Sidebar -->
             <div class="sidebar">
                 <div class="sidebar-header">
                     <div class="user-profile">
                         <img id="user-avatar" src="assets/icons/default-avatar.png" alt="User Avatar">
-                        <span id="username-display"></span>
+                        <div class="user-info">
+                            <span id="username-display"></span>
+                            <span id="user-status" class="status online">Online</span>
+                        </div>
                     </div>
-                    <button id="logout-btn" class="icon-btn">
-                        <i class="fas fa-sign-out-alt"></i>
+                    <div class="header-actions">
+                        <button id="settings-btn" class="icon-btn" title="Settings">
+                            <i class="fas fa-cog"></i>
+                        </button>
+                        <button id="logout-btn" class="icon-btn" title="Logout">
+                            <i class="fas fa-sign-out-alt"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="sidebar-tabs">
+                    <button class="sidebar-tab active" data-tab="chats">
+                        <i class="fas fa-comment-dots"></i>
+                    </button>
+                    <button class="sidebar-tab" data-tab="friends">
+                        <i class="fas fa-user-friends"></i>
+                    </button>
+                    <button class="sidebar-tab" data-tab="calls">
+                        <i class="fas fa-phone"></i>
                     </button>
                 </div>
                 
                 <div class="search-bar">
-                    <input type="text" id="search-contacts" placeholder="Search contacts...">
                     <i class="fas fa-search"></i>
+                    <input type="text" id="search-contacts" placeholder="Search...">
                 </div>
                 
-                <div class="contacts-list" id="contacts-list">
-                    <!-- Contacts will be loaded here -->
+                <!-- Chats Tab -->
+                <div id="chats-tab" class="sidebar-tab-content active">
+                    <div class="contacts-list" id="contacts-list">
+                        <!-- Conversations will be loaded here -->
+                        <div class="empty-state">
+                            <i class="fas fa-comment-alt"></i>
+                            <p>No conversations yet</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Friends Tab -->
+                <div id="friends-tab" class="sidebar-tab-content">
+                    <div class="friends-tabs">
+                        <button class="friends-tab-btn active" data-tab="friends-list">Friends</button>
+                        <button class="friends-tab-btn" data-tab="friend-requests">Requests</button>
+                        <button class="friends-tab-btn" data-tab="add-friend">Add Friend</button>
+                    </div>
+                    
+                    <div id="friends-list-tab" class="friends-tab-content active">
+                        <div class="friends-list" id="friends-list">
+                            <!-- Friends will be loaded here -->
+                            <div class="empty-state">
+                                <i class="fas fa-user-friends"></i>
+                                <p>No friends yet</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="friend-requests-tab" class="friends-tab-content">
+                        <div class="requests-list" id="requests-list">
+                            <!-- Friend requests will be loaded here -->
+                            <div class="empty-state">
+                                <i class="fas fa-user-plus"></i>
+                                <p>No friend requests</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="add-friend-tab" class="friends-tab-content">
+                        <div class="add-friend-form">
+                            <div class="form-group">
+                                <input type="text" id="friend-search" placeholder="Search by username or email">
+                                <button id="search-friend-btn" class="icon-btn">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                            <div class="search-results" id="search-results">
+                                <!-- Search results will appear here -->
+                                <div class="empty-state">
+                                    <i class="fas fa-search"></i>
+                                    <p>Search for friends to add</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Calls Tab -->
+                <div id="calls-tab" class="sidebar-tab-content">
+                    <div class="calls-list" id="calls-list">
+                        <!-- Call history will be loaded here -->
+                        <div class="empty-state">
+                            <i class="fas fa-phone"></i>
+                            <p>No call history</p>
+                        </div>
+                    </div>
                 </div>
             </div>
             
+            <!-- Chat Area -->
             <div class="chat-area">
                 <div id="no-chat-selected" class="no-chat-selected">
                     <div class="empty-state">
                         <img src="assets/icons/chat-icon.png" alt="Chat Icon">
                         <h3>Select a chat to start messaging</h3>
+                        <p>Choose from your existing conversations or start a new one</p>
                     </div>
                 </div>
                 
                 <div id="active-chat" class="active-chat hidden">
                     <div class="chat-header">
                         <div class="chat-user-info">
-                            <img id="chat-user-avatar" src="assets/icons/default-avatar.png" alt="Contact Avatar">
-                            <div>
+                            <div class="user-avatar-container">
+                                <img id="chat-user-avatar" src="assets/icons/default-avatar.png" alt="Contact Avatar">
+                                <span id="chat-user-status" class="status-indicator online"></span>
+                            </div>
+                            <div class="user-details">
                                 <span id="chat-user-name"></span>
-                                <span id="chat-user-status" class="status"></span>
+                                <span id="chat-user-last-seen" class="last-seen">Online</span>
                             </div>
                         </div>
                         <div class="chat-actions">
-                            <button id="voice-call-btn" class="icon-btn">
+                            <button id="search-chat-btn" class="icon-btn" title="Search in chat">
+                                <i class="fas fa-search"></i>
+                            </button>
+                            <button id="voice-call-btn" class="icon-btn" title="Voice call">
                                 <i class="fas fa-phone"></i>
                             </button>
-                            <button id="video-call-btn" class="icon-btn">
+                            <button id="video-call-btn" class="icon-btn" title="Video call">
                                 <i class="fas fa-video"></i>
+                            </button>
+                            <button id="more-options-btn" class="icon-btn" title="More options">
+                                <i class="fas fa-ellipsis-v"></i>
                             </button>
                         </div>
                     </div>
                     
                     <div class="messages-container" id="messages-container">
                         <!-- Messages will be loaded here -->
+                        <div class="message-date">
+                            <span>Today</span>
+                        </div>
                     </div>
                     
                     <div class="message-input-container">
-                        <button id="voice-message-btn" class="icon-btn">
+                        <button id="attach-file-btn" class="icon-btn" title="Attach file">
+                            <i class="fas fa-paperclip"></i>
+                        </button>
+                        <div class="emoji-picker-container">
+                            <button id="emoji-picker-btn" class="icon-btn" title="Emoji">
+                                <i class="far fa-smile"></i>
+                            </button>
+                        </div>
+                        <input type="text" id="message-input" placeholder="Type a message...">
+                        <button id="voice-message-btn" class="icon-btn" title="Record voice message">
                             <i class="fas fa-microphone"></i>
                         </button>
-                        <input type="text" id="message-input" placeholder="Type a message...">
-                        <button id="send-message-btn" class="icon-btn">
+                        <button id="send-message-btn" class="icon-btn" title="Send message">
                             <i class="fas fa-paper-plane"></i>
                         </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Settings Panel -->
+            <div id="settings-panel" class="settings-panel hidden">
+                <div class="settings-header">
+                    <button id="close-settings-btn" class="icon-btn">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                    <h3>Settings</h3>
+                </div>
+                
+                <div class="settings-content">
+                    <div class="settings-profile">
+                        <div class="profile-avatar">
+                            <img id="settings-avatar" src="assets/icons/default-avatar.png" alt="Profile">
+                            <button id="change-avatar-btn" class="edit-btn">
+                                <i class="fas fa-camera"></i>
+                            </button>
+                            <input type="file" id="avatar-upload" accept="image/*" style="display: none;">
+                        </div>
+                        <h4 id="settings-username"></h4>
+                        <p id="settings-email"></p>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <h5>Account Settings</h5>
+                        <div class="settings-item">
+                            <i class="fas fa-user"></i>
+                            <span>Edit Profile</span>
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                        <div class="settings-item">
+                            <i class="fas fa-lock"></i>
+                            <span>Change Password</span>
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <h5>App Settings</h5>
+                        <div class="settings-item toggle-item">
+                            <i class="fas fa-moon"></i>
+                            <span>Dark Mode</span>
+                            <label class="switch">
+                                <input type="checkbox" id="dark-mode-toggle">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <div class="settings-item toggle-item">
+                            <i class="fas fa-bell"></i>
+                            <span>Notifications</span>
+                            <label class="switch">
+                                <input type="checkbox" id="notifications-toggle" checked>
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <div class="settings-item">
+                            <i class="fas fa-paint-brush"></i>
+                            <span>Theme</span>
+                            <span class="theme-value">System Default</span>
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <h5>Privacy</h5>
+                        <div class="settings-item">
+                            <i class="fas fa-eye"></i>
+                            <span>Last Seen</span>
+                            <span class="privacy-value">Friends</span>
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                        <div class="settings-item">
+                            <i class="fas fa-user-circle"></i>
+                            <span>Profile Photo</span>
+                            <span class="privacy-value">Friends</span>
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                        <div class="settings-item">
+                            <i class="fas fa-shield-alt"></i>
+                            <span>Blocked Users</span>
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <div class="settings-item danger">
+                            <i class="fas fa-sign-out-alt"></i>
+                            <span>Logout</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -165,7 +436,9 @@
                 </div>
                 <div class="modal-body">
                     <div class="voice-recorder">
-                        <div id="voice-visualizer" class="voice-visualizer"></div>
+                        <div id="voice-visualizer" class="voice-visualizer">
+                            <canvas id="visualizer-canvas"></canvas>
+                        </div>
                         <div class="recording-controls">
                             <button id="start-recording" class="icon-btn large">
                                 <i class="fas fa-microphone"></i>
@@ -176,12 +449,44 @@
                             <button id="play-recording" class="icon-btn large hidden">
                                 <i class="fas fa-play"></i>
                             </button>
+                            <button id="delete-recording" class="icon-btn large hidden">
+                                <i class="fas fa-trash"></i>
+                            </button>
                             <button id="send-recording" class="icon-btn large hidden">
                                 <i class="fas fa-paper-plane"></i>
                             </button>
                         </div>
                         <div id="recording-timer" class="recording-timer hidden">00:00</div>
                     </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- File Upload Modal -->
+        <div id="file-upload-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Send File</h3>
+                    <button id="close-file-modal" class="icon-btn">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="file-upload-container">
+                        <div class="file-drop-area" id="file-drop-area">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>Drag & drop files here or click to browse</p>
+                            <input type="file" id="file-input" multiple>
+                            <button class="btn-primary">Browse Files</button>
+                        </div>
+                        <div class="file-preview" id="file-preview">
+                            <!-- Files will be previewed here -->
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancel-file-upload" class="btn-secondary">Cancel</button>
+                    <button id="send-files-btn" class="btn-primary" disabled>Send</button>
                 </div>
             </div>
         </div>
@@ -223,6 +528,9 @@
                         <button id="video-toggle" class="icon-btn">
                             <i class="fas fa-video"></i>
                         </button>
+                        <button id="speaker-toggle" class="icon-btn">
+                            <i class="fas fa-volume-up"></i>
+                        </button>
                         <button id="end-call" class="icon-btn reject">
                             <i class="fas fa-phone-slash"></i>
                         </button>
@@ -230,12 +538,74 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Emoji Picker -->
+        <div id="emoji-picker" class="emoji-picker hidden">
+            <div class="emoji-picker-header">
+                <div class="emoji-categories">
+                    <button class="emoji-category-btn active" data-category="smileys">
+                        <i class="far fa-smile"></i>
+                    </button>
+                    <button class="emoji-category-btn" data-category="people">
+                        <i class="fas fa-user"></i>
+                    </button>
+                    <button class="emoji-category-btn" data-category="animals">
+                        <i class="fas fa-paw"></i>
+                    </button>
+                    <button class="emoji-category-btn" data-category="food">
+                        <i class="fas fa-utensils"></i>
+                    </button>
+                    <button class="emoji-category-btn" data-category="travel">
+                        <i class="fas fa-plane"></i>
+                    </button>
+                    <button class="emoji-category-btn" data-category="objects">
+                        <i class="fas fa-lightbulb"></i>
+                    </button>
+                    <button class="emoji-category-btn" data-category="symbols">
+                        <i class="fas fa-heart"></i>
+                    </button>
+                    <button class="emoji-category-btn" data-category="flags">
+                        <i class="fas fa-flag"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="emoji-picker-body">
+                <div class="emoji-search">
+                    <input type="text" placeholder="Search emojis...">
+                    <i class="fas fa-search"></i>
+                </div>
+                <div class="emoji-grid" id="emoji-grid">
+                    <!-- Emojis will be loaded here -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Notification Toast -->
+        <div id="notification-toast" class="notification-toast hidden">
+            <div class="toast-icon">
+                <i class="fas fa-bell"></i>
+            </div>
+            <div class="toast-content">
+                <h4 class="toast-title">New Message</h4>
+                <p class="toast-message">You have a new message from John Doe</p>
+            </div>
+            <button class="toast-close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
     </div>
 
+    <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/emoji-picker/1.1.0/js/emoji-picker.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/recordrtc/5.6.2/RecordRTC.min.js"></script>
+    <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
     <script src="scripts/auth.js"></script>
     <script src="scripts/chat.js"></script>
     <script src="scripts/call.js"></script>
+    <script src="scripts/friends.js"></script>
+    <script src="scripts/settings.js"></script>
+    <script src="scripts/notifications.js"></script>
     <script src="scripts/main.js"></script>
 </body>
 </html>
